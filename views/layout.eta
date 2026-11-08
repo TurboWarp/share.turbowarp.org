@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= it.title %></title>
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="<%= it.isAdmin ? 'style.css' : '/style.css' %>">
 <% if (it.noindex) { %>
   <meta name="robots" content="noindex">
 <% } %>

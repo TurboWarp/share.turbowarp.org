@@ -8,7 +8,7 @@ document.addEventListener('click', async (e) => {
   const report = e.target.closest('.admin-report');
   try {
     if (dismissButton) {
-      await fetchWithErrorHandling(`/api/reports/${dismissButton.dataset.reportId}`, {
+      await fetchWithErrorHandling(`api/reports/${dismissButton.dataset.reportId}`, {
         method: 'DELETE'
       });
       report.classList.add('dismissed');
@@ -17,7 +17,7 @@ document.addEventListener('click', async (e) => {
         return;
       }
       const projectId = report.dataset.projectId;
-      await fetchWithErrorHandling(`/api/projects/${projectId}`, {
+      await fetchWithErrorHandling(`api/projects/${projectId}`, {
         method: 'DELETE'
       });
       // Deleting a project also deletes all of its reports

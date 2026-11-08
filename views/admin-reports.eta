@@ -1,7 +1,7 @@
 <% layout('./layout', {
   title: `Reports - ${it.APP_NAME} Admin`,
   noindex: true,
-  scripts: ['/js/common.js', '/js/admin-reports.js']
+  scripts: ['js/common.js', 'js/admin-reports.js']
 }) %>
   <main class="admin">
     <h1>Reports</h1>
