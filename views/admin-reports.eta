@@ -1,0 +1,23 @@
+<% layout('./layout', {
+  title: 'Reports',
+  noindex: true,
+  scripts: ['/js/common.js', '/js/admin-reports.js']
+}) %>
+  <main class="admin">
+    <p>There are <%= it.reports.length %> report(s).</p>
+<% for (const report of it.reports) { %>
+    <div class="admin-report">
+      <h2><a href="/projects/<%= report.projectId %>"><%= report.projectTitle %></a> <%= report.reportId %></h2>
+      <p>Project description:</p>
+      <textarea readonly autocomplete="off">
+<%= report.projectDescription %></textarea>
+      <p>Report description:</p>
+      <textarea readonly autocomplete="off">
+<%= report.reportBody %></textarea>
+      <p>
+        <button class="dismiss-report" data-report-id="<%= report.reportId %>">Dismiss report</button>
+      </p>
+    </div>
+<% } %>
+    <p><a href="/admin/">Back to admin home</a></p>
+  </main>

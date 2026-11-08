@@ -1,0 +1,5 @@
+<% layout('./layout', {title: `Error ${it.status}`}) %>
+  <main class="narrow">
+    <h1>Error <%= it.status %></h1>
+    <p><%= it.message %></p>
+  </main>

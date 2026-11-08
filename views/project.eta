@@ -1,0 +1,76 @@
+<%
+  const title = it.metadata.title || it.DEFAULT_TITLE;
+  const description = it.metadata.description || it.DEFAULT_DESCRIPTION;
+%>
+<% layout('./layout', {
+  title: `${title} - ${it.APP_NAME}`,
+  ogTitle: title,
+  description,
+  noindex: true,
+  scripts: ['/js/vendor/scaffolding-full.js', '/js/common.js', '/js/project.js']
+}) %>
+  <div class="details">
+    <input
+      class="project-title"
+      value="<%= it.metadata.title %>"
+      placeholder="<%= it.DEFAULT_TITLE %>"
+      autocomplete="off"
+      readonly
+    >
+  </div>
+
+  <div
+    class="player loading"
+    data-project-id="<%= it.projectId %>"
+    data-admin-ownership-token="<%= it.adminOwnershipToken || '' %>"
+    data-md5exts-to-sha256="<%= JSON.stringify(it.md5extsToSha256) %>"
+    data-app-name="<%= it.APP_NAME %>"
+  >
+    <div class="player-project"></div>
+    <div class="player-loading">
+      <div class="loading-bar-outer">
+        <div class="loading-bar-inner"></div>
+      </div>
+    </div>
+    <div class="player-error" hidden>
+      <p class="error-title">Error</p>
+      <p class="error-details"></p>
+    </div>
+  </div>
+
+  <div class="details">
+    <%/* The browser removes one newline right after <textarea>, so always add one */%>
+    <textarea
+      class="project-description"
+      placeholder="<%= it.DEFAULT_DESCRIPTION %>"
+      autocomplete="off"
+      readonly
+    >
+<%= it.metadata.description %></textarea>
+
+    <p>
+      <button class="download">Download project</button>
+    </p>
+
+    <details class="report">
+      <summary>Report this project</summary>
+      <p>
+        All reports are reviewed by a real human volunteer. Help us review reports quickly by not wasting our time.
+      </p>
+      <p>
+        <textarea
+          class="report-body"
+          placeholder="Explain why this project should be removed. Please be comprehensive. We won't be able to reach out for more information."
+        ></textarea>
+      </p>
+      <p>
+        <button class="submit-report">Submit report</button>
+      </p>
+    </details>
+
+    <div class="owner-section" hidden>
+      <p>
+        <button class="delete-project">Delete this project</button>
+      </p>
+    </div>
+  </div>

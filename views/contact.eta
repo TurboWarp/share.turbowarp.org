@@ -1,0 +1,6 @@
+<% layout('./layout', {title: 'Contact Us'}) %>
+  <main class="narrow">
+    <h1>Contact Us</h1>
+    <p>Email us: <%= it.CONTACT %></p>
+    <p>For DMCA requests, please include links to the relevant project(s).</p>
+  </main>

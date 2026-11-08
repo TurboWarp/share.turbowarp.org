@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= it.title %></title>
+  <link rel="stylesheet" href="/style.css">
+<% if (it.noindex) { %>
+  <meta name="robots" content="noindex">
+<% } %>
+<% if (it.description) { %>
+  <meta name="description" content="<%= it.description %>">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="<%= it.ogTitle %>">
+  <meta property="og:description" content="<%= it.description %>">
+<% } %>
+</head>
+<body>
+<%~ it.body %>
+  <footer>
+    <div class="disclaimer">
+      <span class="brand"><%= it.APP_NAME %></span> is not affiliated with Scratch, the Scratch Team, or the Scratch Foundation.
+    </div>
+    <div class="links">
+      <a href="/">Home</a>
+      <a href="https://github.com/GarboMuffin/placeholder">GitHub</a>
+      <a href="/privacy">Privacy</a>
+      <a href="/contact">Contact &amp; DMCA</a>
+    </div>
+  </footer>
+<% for (const script of it.scripts || []) { %>
+  <script src="<%= script %>"></script>
+<% } %>
+</body>
+</html>
