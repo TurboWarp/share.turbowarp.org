@@ -17,6 +17,7 @@
 </head>
 <body>
 <%~ it.body %>
+<% if (!it.isAdmin) { %>
   <footer>
     <div class="disclaimer">
       <span class="brand"><%= it.APP_NAME %></span> is not affiliated with Scratch, the Scratch Team, or the Scratch Foundation.
@@ -28,6 +29,7 @@
       <a href="/contact">Contact &amp; DMCA</a>
     </div>
   </footer>
+<% } %>
 <% for (const script of it.scripts || []) { %>
   <script src="<%= script %>"></script>
 <% } %>

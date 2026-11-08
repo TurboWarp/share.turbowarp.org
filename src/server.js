@@ -1,9 +1,9 @@
 const path = require('node:path');
 const express = require('express');
-const {Eta} = require('eta');
 const db = require('./db');
-const environment = require('./environment');
-const {APP_NAME, CONTACT} = require('./config/brand');
+const createRenderer = require('./render');
+const {notFound, createErrorHandler} = require('./errors');
+const {PUBLIC_URL} = require('./config/brand');
 const metrics = require('./metrics');
 const APIError = require('./APIError');
 const Limits = require('./config/limits');
@@ -16,23 +16,7 @@ app.set('case sensitive routing', true);
 app.set('x-powered-by', false);
 app.set('query parser', (q) => new URLSearchParams(q));
 
-const eta = new Eta({
-  views: path.join(__dirname, '..', 'views'),
-  cache: !environment.isDevelopment
-});
-
-/**
- * @param {import('express').Response} res
- * @param {string} template Name of a file in views/, without extension
- * @param {object} [data]
- */
-const render = (res, template, data) => {
-  res.type('text/html').send(eta.render(`./${template}`, {
-    APP_NAME,
-    CONTACT,
-    ...data
-  }));
-};
+const render = createRenderer();
 
 app.use(metrics.middleware);
 
@@ -66,50 +50,6 @@ const serveFile = (route, file) => {
 serveFile('/js/parse.js', path.join(__dirname, 'parse.js'));
 serveFile('/js/vendor/jszip.min.js', require.resolve('@turbowarp/jszip/dist/jszip.min.js'));
 serveFile('/js/vendor/scaffolding-full.js', require.resolve('@turbowarp/packager/dist/scaffolding/scaffolding-full.js'));
-
-/**
- * @param {import('express').Request} req
- * @param {string} name
- * @returns {string|null}
- */
-const getCookie = (req, name) => {
-  const header = req.get('cookie');
-  if (!header) {
-    return null;
-  }
-  for (const part of header.split(';')) {
-    const index = part.indexOf('=');
-    if (index === -1) {
-      continue;
-    }
-    if (part.substring(0, index).trim() === name) {
-      try {
-        return decodeURIComponent(part.substring(index + 1).trim());
-      } catch (e) {
-        return null;
-      }
-    }
-  }
-  return null;
-};
-
-/**
- * @param {import('express').Request} req
- * @returns {boolean}
- */
-const hasAdminPermissions = (req) => {
-  const token = getCookie(req, 'adminToken');
-  return typeof token === 'string' && db.isValidAdminToken(token);
-};
-
-/**
- * @param {import('express').Request} req
- */
-const validateAdminPermissions = (req) => {
-  if (!hasAdminPermissions(req)) {
-    throw new APIError(401, 'invalid admin token');
-  }
-};
 
 /**
  * @param {import('express').Request} req
@@ -193,38 +133,14 @@ app.get('/projects/:project', (req, res) => {
   const projectId = req.params.project;
   const metadata = db.getCompleteProjectMetadata(projectId);
   const md5extsToSha256 = db.getMd5extToSha256(projectId);
-  const adminOwnershipToken = hasAdminPermissions(req) ? db.getAdminOwnershipToken(projectId) : null;
   db.markProjectAsVisited(projectId);
   render(res, 'project', {
     projectId,
     metadata,
     md5extsToSha256,
-    adminOwnershipToken,
     DEFAULT_TITLE,
     DEFAULT_DESCRIPTION
   });
-});
-
-app.get('/admin', (req, res) => {
-  validateAdminPermissions(req);
-  render(res, 'admin');
-});
-
-app.get('/admin/reports', (req, res) => {
-  validateAdminPermissions(req);
-  render(res, 'admin-reports', {
-    reports: db.getAllReports()
-  });
-});
-
-app.delete('/admin/api/reports/:report', (req, res) => {
-  validateAdminPermissions(req);
-  const reportId = +req.params.report;
-  if (!Number.isSafeInteger(reportId)) {
-    throw new APIError(400, 'invalid report ID');
-  }
-  db.deleteReport(reportId);
-  res.json({});
 });
 
 app.get('/api/assets/:sha256', (req, res) => {
@@ -348,7 +264,7 @@ app.post('/api/projects/:project/report', smallJSONBody, (req, res) => {
     fetch(process.env.REPORT_WEBHOOK, {
       method: 'POST',
       body: JSON.stringify({
-        content: '<@751651888205922348> Someone reported a project on placeholder <https://share.turbowarp.org/admin/reports>'
+        content: `<@751651888205922348> Someone reported a project on placeholder <${PUBLIC_URL}/projects/${projectId}>`
       }),
       headers: {
         'content-type': 'application/json'
@@ -371,35 +287,7 @@ app.put('/api/projects/:project/started', (req, res) => {
   res.json({});
 });
 
-app.use((req, res, next) => {
-  next(new APIError(404, 'Not Found'));
-});
-
-app.use((err, req, res, next) => {
-  // APIError and body-parser errors (too large, invalid JSON, ...) have a status
-  const errorStatus = err && (err.status || err.statusCode);
-  const status = (typeof errorStatus === 'number' && errorStatus >= 400 && errorStatus < 600) ? errorStatus : 500;
-  const message = status < 500 ? `${err.message}` : 'Internal Server Error';
-  if (status >= 500) {
-    console.error(err);
-  }
-
-  if (res.headersSent) {
-    next(err);
-    return;
-  }
-
-  res.status(status);
-  if (req.path.startsWith('/api/') || req.path.startsWith('/admin/api/')) {
-    res.json({
-      message
-    });
-  } else {
-    render(res, 'error', {
-      status,
-      message
-    });
-  }
-});
+app.use(notFound);
+app.use(createErrorHandler(render));
 
 module.exports = app;

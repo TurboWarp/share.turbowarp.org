@@ -6,9 +6,11 @@ const assert = require('node:assert');
 const crypto = require('node:crypto');
 const supertest = require('supertest');
 const app = require('../src/server');
+const adminApp = require('../src/admin');
 const db = require('../src/db');
 
 const request = supertest(app);
+const adminRequest = supertest(adminApp);
 
 // The naughty word list is obfuscated in the source, so do the same here
 const rot13 = (text) => text.replace(/[a-z]/g, (c) => String.fromCharCode((c.charCodeAt(0) - 97 + 13) % 26 + 97));
@@ -270,7 +272,7 @@ test('editing project', async () => {
     .expect(401);
 });
 
-test('reports and admin', async () => {
+test('reports and admin server', async () => {
   const project = await uploadCompleteProject([], 'Reported project');
 
   await request.post(`/api/projects/${project.projectId}/report`)
@@ -285,38 +287,45 @@ test('reports and admin', async () => {
   await request.post(`/api/projects/${project.projectId}/report`)
     .send({body: 'this is a <report>'})
     .expect(200);
-
-  await request.get('/admin').expect(401);
-  await request.get('/admin/reports').expect(401);
-  await request.get('/admin/reports')
-    .set('Cookie', 'adminToken=wrong')
-    .expect(401);
-
-  const adminToken = db.createAdminToken('test');
-  const cookie = `foo=bar; adminToken=${adminToken}`;
-
-  await request.get('/admin').set('Cookie', cookie).expect(200);
-  await request.get('/admin/').set('Cookie', cookie).expect(200);
-  const reports = await request.get('/admin/reports')
-    .set('Cookie', cookie)
+  await request.post(`/api/projects/${project.projectId}/report`)
+    .send({body: 'another report'})
     .expect(200);
+
+  // None of the admin stuff exists on the public server
+  await request.get('/admin').expect(404);
+  await request.get('/admin/reports').expect(404);
+  await request.get('/api/reports/1').expect(404);
+
+  const reports = await adminRequest.get('/').expect(200);
   assert.ok(reports.text.includes('this is a &lt;report&gt;'));
-  const reportId = db.getAllReports().find((i) => i.projectId === project.projectId).reportId;
+  assert.ok(reports.text.includes(`https://share.turbowarp.org/projects/${project.projectId}`));
+  assert.ok(!reports.text.includes('<footer>'));
+  await adminRequest.get('/style.css').expect(200);
+  await adminRequest.get('/js/admin-reports.js').expect(200);
+  await adminRequest.get('/does-not-exist').expect(404);
 
-  // Admins get the ownership token on the project page, normal users don't
-  const normalPage = await request.get(`/projects/${project.projectId}`).expect(200);
-  assert.ok(!normalPage.text.includes(project.ownershipToken));
-  const adminPage = await request.get(`/projects/${project.projectId}`)
-    .set('Cookie', cookie)
-    .expect(200);
-  assert.ok(adminPage.text.includes(project.ownershipToken));
+  const projectReports = () => db.getAllReports().filter((i) => i.projectId === project.projectId);
+  assert.strictEqual(projectReports().length, 2);
+  const reportId = projectReports()[0].reportId;
 
-  await request.delete(`/admin/api/reports/${reportId}`).expect(401);
-  await request.delete('/admin/api/reports/abc')
-    .set('Cookie', cookie)
-    .expect(400);
-  await request.delete(`/admin/api/reports/${reportId}`)
-    .set('Cookie', cookie)
+  await adminRequest.delete('/api/reports/abc').expect(400);
+  await adminRequest.delete(`/api/reports/${reportId}`)
+    .set('Sec-Fetch-Site', 'cross-site')
+    .expect(403);
+  await adminRequest.delete(`/api/reports/${reportId}`)
+    .set('Sec-Fetch-Site', 'same-site')
+    .expect(403);
+  assert.strictEqual(projectReports().length, 2);
+  await adminRequest.delete(`/api/reports/${reportId}`)
+    .set('Sec-Fetch-Site', 'same-origin')
     .expect(200);
-  assert.ok(!db.getAllReports().some((i) => i.reportId === reportId));
+  assert.strictEqual(projectReports().length, 1);
+
+  await adminRequest.delete(`/api/projects/${project.projectId}`)
+    .set('Sec-Fetch-Site', 'cross-site')
+    .expect(403);
+  await request.get(`/api/projects/${project.projectId}`).expect(200);
+  await adminRequest.delete(`/api/projects/${project.projectId}`).expect(200);
+  await request.get(`/api/projects/${project.projectId}`).expect(404);
+  assert.strictEqual(projectReports().length, 0);
 });

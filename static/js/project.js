@@ -9,7 +9,7 @@
   const appName = player.dataset.appName;
   const defaultTitle = titleInput.placeholder;
 
-  const ownershipToken = player.dataset.adminOwnershipToken || getOwnershipToken(projectId);
+  const ownershipToken = getOwnershipToken(projectId);
   let projectTitle = titleInput.value;
 
   const descriptionInput = document.querySelector('.project-description');

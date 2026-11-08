@@ -22,7 +22,6 @@
   <div
     class="player loading"
     data-project-id="<%= it.projectId %>"
-    data-admin-ownership-token="<%= it.adminOwnershipToken || '' %>"
     data-md5exts-to-sha256="<%= JSON.stringify(it.md5extsToSha256) %>"
     data-app-name="<%= it.APP_NAME %>"
   >

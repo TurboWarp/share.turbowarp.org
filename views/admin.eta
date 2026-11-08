@@ -1,6 +1,0 @@
-<% layout('./layout', {title: 'Admin', noindex: true}) %>
-  <main class="admin">
-    <ul>
-      <li><a href="/admin/reports">Reports</a></li>
-    </ul>
-  </main>

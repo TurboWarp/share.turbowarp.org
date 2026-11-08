@@ -117,16 +117,6 @@ END;`);
 
 db.exec(`CREATE INDEX IF NOT EXISTS complete_project_assets_by_sha256 ON complete_project_assets(asset_sha256);`);
 
-// TODO: I would not be surprised if this is susceptible to timing attacks
-db.exec(`
-CREATE TABLE IF NOT EXISTS admin_tokens (
-  secret_token TEXT PRIMARY KEY NOT NULL,
-
-  -- name is just a more memorable description; this isn't used for security
-  name TEXT NOT NULL
-) STRICT;
-`);
-
 db.exec(`
 CREATE TABLE IF NOT EXISTS admin_project_reports (
   report_id INTEGER PRIMARY KEY NOT NULL,
@@ -260,20 +250,6 @@ const createOwnershipToken = (projectId) => {
   const token = nodeCrypto.randomUUID();
   _insertOwnershipToken.run(token, projectId);
   return token;
-};
-
-const _getAnyOwnershipToken = db.prepare(`SELECT ownership_token FROM ownership_tokens WHERE project_id=?;`);
-/**
- * @param {string} projectId
- * @returns {string|null}
- */
-const getAdminOwnershipToken = (projectId) => {
-  // For now we'll just use the the first token, which is guaranteed to always exist.
-  const result = _getAnyOwnershipToken.get(projectId);
-  if (!result) {
-    return null;
-  }
-  return result.ownership_token;
 };
 
 const _getCompleteAssetSize = db.prepare(`SELECT length(data) AS size FROM assets WHERE asset_sha256=?;`);
@@ -478,26 +454,6 @@ const deleteProject = (projectId) => {
   _deleteProject.run(projectId);
 };
 
-const _createAdminToken = db.prepare(`INSERT INTO admin_tokens (secret_token, name) VALUES (?, ?);`);
-/**
- * @param {string} name
- * @returns {string} The secret token
- */
-const createAdminToken = (name) => {
-  const secretToken = nodeCrypto.randomUUID();
-  _createAdminToken.run(secretToken, name);
-  return secretToken;
-};
-
-const _validateAdminToken = db.prepare(`SELECT 1 FROM admin_tokens WHERE secret_token=?;`);
-/**
- * @param {string} secretToken
- * @returns {boolean}
- */
-const isValidAdminToken = (secretToken) => {
-  return !!_validateAdminToken.get(secretToken);
-};
-
 const _createReport = db.prepare(`INSERT INTO admin_project_reports (project_id, report_body) VALUES (?, ?);`);
 /**
  * @param {string} projectId
@@ -563,7 +519,6 @@ const markProjectAsStarted = (projectId) => {
 
 module.exports = {
   createIncompleteProject,
-  getAdminOwnershipToken,
   finishIncompleteAsset,
   finishIncompleteProject,
   isValidOwnershipToken,
@@ -574,8 +529,6 @@ module.exports = {
   setProjectTitle,
   setProjectDescription,
   deleteProject,
-  createAdminToken,
-  isValidAdminToken,
   createReport,
   deleteReport,
   getAllReports,
