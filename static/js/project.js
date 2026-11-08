@@ -112,7 +112,12 @@
     flagScreenIconOuter.appendChild(flagScreenIcon);
     flagScreen.appendChild(flagScreenIconOuter);
 
-    const greenFlag = createControlButton('green-flag-button', '/icons/green-flag-button.svg', () => {
+    const greenFlag = createControlButton('green-flag-button', '/icons/green-flag-button.svg', (e) => {
+      e.preventDefault();
+      if (e.shiftKey) {
+        vm.setTurboMode(!vm.runtime.turboMode);
+        return;
+      }
       pressGreenFlag();
       flagScreen.remove();
     });
@@ -136,6 +141,31 @@
     scaffolding.addControlButton({
       element: stopAll.button,
       where: 'top-left'
+    });
+
+    const turboIndicator = document.createElement('div');
+    turboIndicator.className = 'turbo-indicator';
+    turboIndicator.hidden = true;
+    const turboIcon = document.createElement('img');
+    turboIcon.className = 'turbo-icon';
+    turboIcon.src = '/icons/turbo.svg';
+    turboIcon.draggable = false;
+    turboIcon.width = 16;
+    turboIcon.height = 16;
+    turboIndicator.appendChild(turboIcon);
+    const turboLabel = document.createElement('div');
+    turboLabel.className = 'turbo-label';
+    turboLabel.textContent = 'Turbo Mode';
+    turboIndicator.appendChild(turboLabel);
+    scaffolding.addControlButton({
+      element: turboIndicator,
+      where: 'top-left'
+    });
+    vm.on('TURBO_MODE_ON', () => {
+      turboIndicator.hidden = false;
+    });
+    vm.on('TURBO_MODE_OFF', () => {
+      turboIndicator.hidden = true;
     });
 
     const fullscreen = createControlButton('fullscreen-button', '/icons/fullscreen-button.svg', () => {
