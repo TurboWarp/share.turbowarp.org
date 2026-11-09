@@ -7,6 +7,7 @@ set -euxo pipefail
 
 sqlite3 unshared.db "
 PRAGMA foreign_keys = ON;
+PRAGMA secure_delete = FAST;
 BEGIN TRANSACTION;
 
 DELETE

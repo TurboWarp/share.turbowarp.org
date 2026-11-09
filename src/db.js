@@ -18,6 +18,7 @@ const db = new sqlite(environment.isTest ? ':memory:' : 'unshared.db');
 
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
+db.pragma('secure_delete = FAST');
 
 /*
   BEGIN TRANSACTION;
