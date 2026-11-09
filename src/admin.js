@@ -8,6 +8,7 @@ const createRenderer = require('./render');
 const {notFound, createErrorHandler} = require('./errors');
 const {PUBLIC_URL} = require('./config/brand');
 const APIError = require('./APIError');
+const metrics = require('./metrics');
 
 const app = express();
 
@@ -59,7 +60,9 @@ app.delete('/api/reports/:report', (req, res) => {
 
 app.delete('/api/projects/:project', (req, res) => {
   // Also deletes the project's reports
-  db.deleteProject(req.params.project);
+  if (db.deleteProject(req.params.project)) {
+    metrics.projectsDeleted.inc({by: 'admin'});
+  }
   res.json({});
 });
 

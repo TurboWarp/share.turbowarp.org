@@ -180,12 +180,25 @@ app.post('/api/projects/new', newProjectBody, (req, res) => {
     title = 'Project';
   }
 
+  const projectJSON = Buffer.from(projectData);
   const incompleteProject = db.createIncompleteProject(
-    Buffer.from(projectData),
+    projectJSON,
     parsedProject,
     body.assetInformation,
     title
   );
+
+  let projectSize = projectJSON.byteLength;
+  for (const md5ext of parsedProject.md5exts) {
+    projectSize += body.assetInformation[md5ext].size;
+  }
+  metrics.projectsCreated.inc();
+  metrics.projectAssets.inc({state: 'reused'}, parsedProject.md5exts.length - incompleteProject.missingMd5exts.length);
+  metrics.projectAssets.inc({state: 'missing'}, incompleteProject.missingMd5exts.length);
+  metrics.projectJSONSize.observe(projectJSON.byteLength);
+  metrics.projectSize.observe(projectSize);
+  metrics.projectAssetCount.observe(parsedProject.md5exts.length);
+
   res.json(incompleteProject);
 });
 
@@ -227,7 +240,9 @@ app.post('/api/projects/:project', smallJSONBody, (req, res) => {
 
 app.delete('/api/projects/:project', (req, res) => {
   validateOwnership(req);
-  db.deleteProject(req.params.project);
+  if (db.deleteProject(req.params.project)) {
+    metrics.projectsDeleted.inc({by: 'owner'});
+  }
   res.json({});
 });
 
@@ -237,12 +252,16 @@ app.post('/api/projects/:project/assets/:md5ext', assetBody, (req, res) => {
     throw new APIError(400, 'missing asset');
   }
   db.finishIncompleteAsset(req.params.project, req.params.md5ext, req.body);
+  metrics.assetUploadSize.observe(req.body.byteLength);
   res.json({});
 });
 
 app.post('/api/projects/:project/complete', (req, res) => {
   validateOwnership(req);
-  db.finishIncompleteProject(req.params.project);
+  const uploadDuration = db.finishIncompleteProject(req.params.project);
+  if (uploadDuration !== null) {
+    metrics.projectUploadDuration.observe(uploadDuration);
+  }
   res.json({});
 });
 
@@ -259,6 +278,7 @@ app.post('/api/projects/:project/report', smallJSONBody, (req, res) => {
   // Throws 404 if the project doesn't exist
   db.getCompleteProjectMetadata(projectId);
   db.createReport(projectId, reportBody);
+  metrics.reports.inc();
 
   if (process.env.REPORT_WEBHOOK) {
     fetch(process.env.REPORT_WEBHOOK, {
@@ -272,9 +292,11 @@ app.post('/api/projects/:project/report', smallJSONBody, (req, res) => {
     })
       .then((r) => {
         console.log('webhook status', r.status);
+        metrics.reportWebhooks.inc({result: r.ok ? 'ok' : 'error'});
       })
       .catch((err) => {
         console.error('webhook error', err);
+        metrics.reportWebhooks.inc({result: 'error'});
       });
   }
 

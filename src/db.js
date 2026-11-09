@@ -341,18 +341,23 @@ const _hasIncompleteAssets = db.prepare(`
   SELECT 1 FROM incomplete_project_assets WHERE project_id=?;
 `);
 const _finishIncompleteProject = db.prepare(`
-  UPDATE projects SET complete=TRUE WHERE project_id=?;
+  UPDATE projects SET complete=TRUE WHERE project_id=? AND complete=FALSE RETURNING created_at;
 `);
 const finishIncompleteProject = db.transaction(
   /**
    * @param {string} projectId
+   * @returns {number|null} Seconds since the project was created, or null if it was already complete.
    */
   (projectId) => {
     const hasIncompleteAssets = !!_hasIncompleteAssets.get(projectId);
     if (hasIncompleteAssets) {
       throw new APIError(400, 'project is not complete');
     }
-    _finishIncompleteProject.run(projectId);
+    const result = _finishIncompleteProject.get(projectId);
+    if (!result) {
+      return null;
+    }
+    return Math.max(0, Date.now() / 1000 - result.created_at);
   }
 );
 
@@ -449,9 +454,10 @@ const setProjectDescription = (projectId, description) => {
 const _deleteProject = db.prepare(`DELETE FROM projects WHERE project_id=?;`);
 /**
  * @param {string} projectId
+ * @returns {boolean} true if a project was deleted
  */
 const deleteProject = (projectId) => {
-  _deleteProject.run(projectId);
+  return _deleteProject.run(projectId).changes > 0;
 };
 
 const _createReport = db.prepare(`INSERT INTO admin_project_reports (project_id, report_body) VALUES (?, ?);`);
@@ -517,7 +523,47 @@ const markProjectAsStarted = (projectId) => {
   _markProjectAsStarted.run(projectId);
 };
 
+const _countProjects = db.prepare('SELECT complete, count(*) AS count FROM projects GROUP BY complete;');
+/**
+ * @returns {{complete: number; incomplete: number}}
+ */
+const countProjects = () => {
+  const counts = {
+    complete: 0,
+    incomplete: 0
+  };
+  for (const {complete, count} of _countProjects.all()) {
+    counts[complete ? 'complete' : 'incomplete'] += count;
+  }
+  return counts;
+};
+
+const _countAssets = db.prepare('SELECT count(*) AS count FROM assets;');
+const countAssets = () => _countAssets.get().count;
+
+const _countReports = db.prepare('SELECT count(*) AS count FROM admin_project_reports;');
+const countReports = () => _countReports.get().count;
+
+const getStorageSizes = () => ({
+  projectData: _getTotalProjectDataSize.get().size ?? 0,
+  assets: _getTotalCompleteAssetSize.get().size ?? 0,
+  incompleteAssets: _getTotalIncompleteAssetSize.get().size ?? 0
+});
+
+const getDatabaseFileSizes = () => {
+  const pageSize = db.pragma('page_size', {simple: true});
+  return {
+    size: db.pragma('page_count', {simple: true}) * pageSize,
+    free: db.pragma('freelist_count', {simple: true}) * pageSize
+  };
+};
+
 module.exports = {
+  countProjects,
+  countAssets,
+  countReports,
+  getStorageSizes,
+  getDatabaseFileSizes,
   createIncompleteProject,
   finishIncompleteAsset,
   finishIncompleteProject,
