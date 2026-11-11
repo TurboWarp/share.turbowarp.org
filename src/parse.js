@@ -8,6 +8,13 @@
     'wav'
   ];
 
+  const FONT_FORMATS = [
+    'ttf',
+    'otf',
+    'woff',
+    'woff2'
+  ];
+
   // intentionally not case insensitive
   const ASSET_ID_REGEX = /^[0-9a-f]{32}$/;
 
@@ -71,6 +78,38 @@
 
         return `${md5}.${dataFormat}`;
       });
+
+    // TurboWarp custom fonts: [{system: false, family, fallback, md5ext}] or [{system: true, family, fallback}]
+    const customFonts = projectJSON.customFonts;
+    if (customFonts !== undefined && customFonts !== null) {
+      if (!Array.isArray(customFonts)) {
+        throw new Error('customFonts is not an array');
+      }
+
+      for (const font of customFonts) {
+        if (!isObject(font)) {
+          throw new Error('font is not an object');
+        }
+        if (font.system) {
+          continue;
+        }
+
+        const md5ext = font.md5ext;
+        if (typeof md5ext !== 'string') {
+          throw new Error('font md5ext is not string');
+        }
+        const [md5, dataFormat, ...rest] = md5ext.split('.');
+        if (!ASSET_ID_REGEX.test(md5) || rest.length !== 0) {
+          throw new Error(`Invalid font md5ext: ${md5ext}`);
+        }
+        // Case sensitive because the player looks up fonts using the lowercase extension
+        if (!FONT_FORMATS.includes(dataFormat)) {
+          throw new Error(`Unknown font format: ${dataFormat}`);
+        }
+
+        md5exts.push(md5ext);
+      }
+    }
 
     return {
       md5exts: Array.from(new Set(md5exts))

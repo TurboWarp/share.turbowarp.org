@@ -87,7 +87,7 @@
 
     const storage = scaffolding.storage;
     storage.addWebStore(
-      [storage.AssetType.ImageVector, storage.AssetType.ImageBitmap, storage.AssetType.Sound],
+      [storage.AssetType.ImageVector, storage.AssetType.ImageBitmap, storage.AssetType.Sound, storage.AssetType.Font],
       (asset) => {
         const md5ext = `${asset.assetId}.${asset.dataFormat}`;
         const sha256 = md5extsToSha256[md5ext];

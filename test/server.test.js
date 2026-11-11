@@ -9,6 +9,8 @@ const app = require('../src/server');
 const adminApp = require('../src/admin');
 const db = require('../src/db');
 
+const {parseProject} = require('../src/parse');
+
 const request = supertest(app);
 const adminRequest = supertest(adminApp);
 
@@ -232,6 +234,46 @@ test('invalid new project requests', async () => {
     .expect('Content-Type', /json/)
     .expect(400);
   await request.post('/api/projects/new').expect(400);
+});
+
+test('custom fonts', async () => {
+  const fontData = Buffer.from(`not really a font ${Math.random()}`);
+  const font = {
+    data: fontData,
+    md5ext: `${md5(fontData)}.ttf`,
+    sha256: sha256(fontData)
+  };
+  const costume = makeAsset(`<svg xmlns="http://www.w3.org/2000/svg">${Math.random()}</svg>`);
+
+  const projectJSON = JSON.parse(makeProjectJSON([costume]));
+  projectJSON.customFonts = [
+    {system: true, family: 'Comic Sans MS', fallback: 'sans-serif'},
+    {system: false, family: 'Custom', fallback: 'sans-serif', md5ext: font.md5ext}
+  ];
+  const projectData = JSON.stringify(projectJSON);
+  assert.deepStrictEqual(parseProject(projectData).md5exts, [costume.md5ext, font.md5ext]);
+
+  const res = await request.post('/api/projects/new')
+    .send({project: projectData, assetInformation: assetInformationFor([costume, font]), title: 'x'})
+    .expect(200);
+  assert.deepStrictEqual(res.body.missingMd5exts.sort(), [costume.md5ext, font.md5ext].sort());
+  for (const asset of [costume, font]) {
+    await uploadAsset(res.body.projectId, res.body.ownershipToken, asset).expect(200);
+  }
+  await request.post(`/api/projects/${res.body.projectId}/complete`)
+    .set('x-ownership-token', res.body.ownershipToken)
+    .expect(200);
+  const page = await request.get(`/projects/${res.body.projectId}`).expect(200);
+  assert.ok(page.text.includes(font.sha256));
+
+  const withFonts = (customFonts) => JSON.stringify({...projectJSON, customFonts});
+  assert.throws(() => parseProject(withFonts({})), /customFonts is not an array/);
+  assert.throws(() => parseProject(withFonts([null])), /font is not an object/);
+  assert.throws(() => parseProject(withFonts([{system: false}])), /font md5ext is not string/);
+  assert.throws(() => parseProject(withFonts([{system: false, md5ext: 'abc.ttf'}])), /Invalid font md5ext/);
+  assert.throws(() => parseProject(withFonts([{system: false, md5ext: `${md5(fontData)}.ttf.ttf`}])), /Invalid font md5ext/);
+  assert.throws(() => parseProject(withFonts([{system: false, md5ext: `${md5(fontData)}.exe`}])), /Unknown font format/);
+  assert.throws(() => parseProject(withFonts([{system: false, md5ext: `${md5(fontData)}.TTF`}])), /Unknown font format/);
 });
 
 test('naughty and long titles are replaced on creation', async () => {
