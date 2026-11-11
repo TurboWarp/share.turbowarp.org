@@ -277,10 +277,11 @@ app.post('/api/projects/:project/report', smallJSONBody, (req, res) => {
 
   // Throws 404 if the project doesn't exist
   db.getCompleteProjectMetadata(projectId);
-  db.createReport(projectId, reportBody);
-  metrics.reports.inc();
+  const stored = db.createReport(projectId, reportBody);
+  metrics.reports.inc({ignored: stored ? 'false' : 'true'});
 
-  if (process.env.REPORT_WEBHOOK) {
+  // Ignored reports still look successful so the reporter doesn't try to work around it.
+  if (stored && process.env.REPORT_WEBHOOK) {
     fetch(process.env.REPORT_WEBHOOK, {
       method: 'POST',
       body: JSON.stringify({

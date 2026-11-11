@@ -122,7 +122,8 @@ const projectsDeleted = new client.Counter({
 
 const reports = new client.Counter({
   name: 'share_reports_total',
-  help: 'Reports'
+  help: 'Reports',
+  labelNames: ['ignored']
 });
 
 const reportWebhooks = new client.Counter({

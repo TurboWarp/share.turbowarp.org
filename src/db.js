@@ -126,6 +126,13 @@ CREATE TABLE IF NOT EXISTS admin_project_reports (
 ) STRICT;
 `);
 
+db.exec(`
+CREATE TABLE IF NOT EXISTS admin_ignored_report_projects (
+  -- projects whose new reports are silently discarded
+  project_id TEXT PRIMARY KEY NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE
+) STRICT;
+`);
+
 const _getTotalProjectDataSize = db.prepare('SELECT sum(length(data)) AS size FROM projects;');
 const _getTotalCompleteAssetSize = db.prepare('SELECT sum(length(data)) AS size FROM assets;');
 const _getTotalIncompleteAssetSize = db.prepare('SELECT sum(asset_size) AS size FROM incomplete_project_assets;');
@@ -461,14 +468,34 @@ const deleteProject = (projectId) => {
   return _deleteProject.run(projectId).changes > 0;
 };
 
-const _createReport = db.prepare(`INSERT INTO admin_project_reports (project_id, report_body) VALUES (?, ?);`);
+const _createReport = db.prepare(`
+  INSERT INTO admin_project_reports (project_id, report_body)
+  SELECT @projectId, @reportBody WHERE NOT EXISTS (SELECT 1 FROM admin_ignored_report_projects WHERE project_id=@projectId);
+`);
 /**
  * @param {string} projectId
  * @param {string} reportBody
+ * @returns {boolean} false if reports for this project are being ignored
  */
 const createReport = (projectId, reportBody) => {
-  _createReport.run(projectId, reportBody);
+  return _createReport.run({projectId, reportBody}).changes > 0;
 };
+
+const _ignoreReports = db.prepare(`
+  INSERT INTO admin_ignored_report_projects (project_id)
+  SELECT project_id FROM projects WHERE project_id=? ON CONFLICT DO NOTHING;
+`);
+const _deleteProjectReports = db.prepare(`DELETE FROM admin_project_reports WHERE project_id=?;`);
+const ignoreReports = db.transaction(
+  /**
+   * Dismisses all of a project's reports and discards any future ones.
+   * @param {string} projectId
+   */
+  (projectId) => {
+    _ignoreReports.run(projectId);
+    _deleteProjectReports.run(projectId);
+  }
+);
 
 const _deleteReport = db.prepare(`DELETE FROM admin_project_reports WHERE report_id=?;`);
 /**
@@ -578,6 +605,7 @@ module.exports = {
   deleteProject,
   createReport,
   deleteReport,
+  ignoreReports,
   getAllReports,
   markProjectAsVisited,
   markProjectAsLoaded,

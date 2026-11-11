@@ -329,3 +329,40 @@ test('reports and admin server', async () => {
   await request.get(`/api/projects/${project.projectId}`).expect(404);
   assert.strictEqual(projectReports().length, 0);
 });
+
+test('ignoring reports for a project', async () => {
+  const project = await uploadCompleteProject([], 'Ignored project');
+  const otherProject = await uploadCompleteProject([], 'Other project');
+  const reportsFor = (p) => db.getAllReports().filter((i) => i.projectId === p.projectId);
+  const report = (p) => request.post(`/api/projects/${p.projectId}/report`)
+    .send({body: 'report'})
+    .expect(200);
+
+  await report(project);
+  await report(project);
+  await report(otherProject);
+  assert.strictEqual(reportsFor(project).length, 2);
+
+  await adminRequest.put(`/api/projects/${project.projectId}/ignore-reports`)
+    .set('Sec-Fetch-Site', 'cross-site')
+    .expect(403);
+  assert.strictEqual(reportsFor(project).length, 2);
+
+  await adminRequest.put(`/api/projects/${project.projectId}/ignore-reports`).expect(200);
+  // Idempotent, and harmless for projects that don't exist
+  await adminRequest.put(`/api/projects/${project.projectId}/ignore-reports`).expect(200);
+  await adminRequest.put('/api/projects/does-not-exist/ignore-reports').expect(200);
+  await request.put(`/api/projects/${project.projectId}/ignore-reports`).expect(404);
+
+  // Existing reports are dismissed and new ones look successful but aren't stored
+  assert.strictEqual(reportsFor(project).length, 0);
+  await report(project);
+  assert.strictEqual(reportsFor(project).length, 0);
+
+  // Other projects are unaffected
+  await report(otherProject);
+  assert.strictEqual(reportsFor(otherProject).length, 2);
+
+  // Deleting the project cleans up the ignore entry
+  await adminRequest.delete(`/api/projects/${project.projectId}`).expect(200);
+});

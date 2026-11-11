@@ -58,6 +58,12 @@ app.delete('/api/reports/:report', (req, res) => {
   res.json({});
 });
 
+app.put('/api/projects/:project/ignore-reports', (req, res) => {
+  // Also dismisses the project's existing reports
+  db.ignoreReports(req.params.project);
+  res.json({});
+});
+
 app.delete('/api/projects/:project', (req, res) => {
   // Also deletes the project's reports
   if (db.deleteProject(req.params.project)) {

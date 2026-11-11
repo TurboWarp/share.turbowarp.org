@@ -17,6 +17,7 @@
 <%= report.reportBody %></textarea>
       <p>
         <button class="dismiss-report" data-report-id="<%= report.reportId %>">Dismiss report</button>
+        <button class="ignore-reports">Dismiss and ignore future reports for project</button>
         <button class="delete-project">Delete project</button>
       </p>
     </div>
