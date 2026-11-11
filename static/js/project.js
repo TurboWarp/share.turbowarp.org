@@ -14,6 +14,7 @@
 
   const descriptionInput = document.querySelector('.project-description');
   const downloadButton = document.querySelector('.download');
+  const downloadButtonText = 'Download project';
   const reportBodyInput = document.querySelector('.report-body');
   const submitReportButton = document.querySelector('.submit-report');
   const ownerSection = document.querySelector('.owner-section');
@@ -27,6 +28,7 @@
 
   let vm = null;
   let isStarted = false;
+  let isLoaded = false;
 
   const setProgress = (progress) => {
     loadingBar.style.width = `${progress * 100}%`;
@@ -190,27 +192,51 @@
     await scaffolding.loadProject(projectData);
     player.classList.remove('loading');
     loadingScreen.hidden = true;
+
+    isLoaded = true;
+    downloadButton.disabled = false;
+    downloadButton.textContent = downloadButtonText;
   };
 
   loadProject().catch((e) => {
     console.error(e);
     errorDetails.textContent = `${e}`;
     errorScreen.hidden = false;
+    downloadButton.textContent = 'Download project (project failed to load)';
   });
 
+  let isSaving = false;
+
   downloadButton.addEventListener('click', async () => {
-    if (!vm) {
+    // Saving before the project finishes loading would produce a project missing its assets.
+    if (!isLoaded || isSaving) {
       return;
     }
-    const blob = await vm.saveProjectSb3();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${projectTitle}.sb3`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+
+    isSaving = true;
+    downloadButton.disabled = true;
+    downloadButton.textContent = 'Saving... 0%';
+
+    try {
+      const blob = await vm.saveProjectSb3Stream('blob').accumulate((metadata) => {
+        downloadButton.textContent = `Saving... ${Math.floor(metadata.percent)}%`;
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${projectTitle || defaultTitle}.sb3`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+      alert(`Could not save project: ${e}`);
+    }
+
+    isSaving = false;
+    downloadButton.disabled = false;
+    downloadButton.textContent = downloadButtonText;
   });
 
   const updateProject = async (changes) => {

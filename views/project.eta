@@ -48,7 +48,7 @@
 <%= it.metadata.description %></textarea>
 
     <p>
-      <button class="download">Download project</button>
+      <button class="download" disabled>Download project (waiting for project to load...)</button>
     </p>
 
     <details class="report">
